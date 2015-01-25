@@ -1,15 +1,33 @@
 SpeechBubbler = require "./ui/speech_bubbler"
 
-bubble = new SpeechBubbler()
+initCanvas = require "./ui/init_canvas"
 
-bubble.render "Test message here and here in a new line? How come this is a thing how much text can this thing handle, can it handle a lot of text?"
+initCanvas()
 
-console.log bubble.toDataURL()
+SceneManager = require "./scene_manager"
 
-image = new Image()
-image.src = bubble.toDataURL()
+sceneManager = new SceneManager()
 
-document.body.appendChild image
+sceneManager.render()
+
+Character = require "./characters/character.coffee"
+
+char1 = new Character sceneManager.scene
+
+char1.sayMessage "Hello"
+
+window.char1 = char1
+
+# bubble = new SpeechBubbler()
+
+# bubble.render "Test message here and here in a new line? How come this is a thing how much text can this thing handle, can it handle a lot of text?"
+
+# console.log bubble.toDataURL()
+
+# image = new Image()
+# image.src = bubble.toDataURL()
+
+# document.body.appendChild image
 
 Speech = require "speechjs"
 
@@ -18,12 +36,20 @@ recognizer = new Speech(
   continuous: true
   interimResults: true
   autoRestart: true
+  pfilter: false
 )
 
+
+currentImage = null
+recognizer.on "interimResult", ->
+  # if currentImage is null
+  #   bubble.render "..."
+  #   currentImage = new Image()
+  #   currentImage.src = bubble.toDataURL()
+  #   document.body.appendChild currentImage
+  #   console.log "started"
+
 recognizer.on "finalResult", (message) ->
-  bubble.render message
-  image = new Image()
-  image.src = bubble.toDataURL()
-  document.body.appendChild image
+  char1.sayMessage message
 
 recognizer.start()

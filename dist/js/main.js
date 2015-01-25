@@ -402,21 +402,87 @@ function monospace(text, start, end, width) {
     }
 }
 },{}],4:[function(require,module,exports){
-var Speech, SpeechBubbler, bubble, image, recognizer;
+var Character, SpeechBubbler,
+  __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+
+SpeechBubbler = require("../ui/speech_bubbler");
+
+Character = (function() {
+  Character.prototype.id = null;
+
+  Character.prototype.bubbler = null;
+
+  Character.prototype.messageTimeout = null;
+
+  Character.prototype.characterMesh = null;
+
+  Character.prototype.speechBubbleMesh = null;
+
+  Character.prototype.characterMaterial = null;
+
+  function Character(scene) {
+    this.clearMessage = __bind(this.clearMessage, this);
+    var characterGeometry, speechGeometry;
+    this.bubbler = new SpeechBubbler();
+    this.speechTexture = new THREE.Texture(this.bubbler.canvas);
+    this.speechTexture.needsUpdate = true;
+    this.characterMaterial = new THREE.MeshBasicMaterial({
+      color: "red",
+      side: THREE.DoubleSide
+    });
+    characterGeometry = new THREE.PlaneGeometry(25, 35, 1, 1);
+    this.characterMesh = new THREE.Mesh(characterGeometry, this.characterMaterial);
+    this.characterMesh.position.set(-100, 25, 0);
+    scene.add(this.characterMesh);
+    this.speechMaterial = new THREE.MeshBasicMaterial({
+      map: this.speechTexture,
+      side: THREE.DoubleSide
+    });
+    this.speechMaterial.transparent = true;
+    speechGeometry = new THREE.PlaneGeometry(50, 80, 1, 1);
+    this.speechMesh = new THREE.Mesh(speechGeometry, this.speechMaterial);
+    this.speechMesh.position.set(-70, 25 + 35 + 23, 0);
+    scene.add(this.speechMesh);
+  }
+
+  Character.prototype.moveToPosition = function(x, y) {};
+
+  Character.prototype.sayMessage = function(text) {
+    this.bubbler.render(text);
+    return this.speechTexture.needsUpdate = true;
+  };
+
+  Character.prototype.clearMessage = function() {};
+
+  return Character;
+
+})();
+
+module.exports = Character;
+
+
+},{"../ui/speech_bubbler":8}],5:[function(require,module,exports){
+var Character, SceneManager, Speech, SpeechBubbler, char1, currentImage, initCanvas, recognizer, sceneManager;
 
 SpeechBubbler = require("./ui/speech_bubbler");
 
-bubble = new SpeechBubbler();
+initCanvas = require("./ui/init_canvas");
 
-bubble.render("Test message here and here in a new line? How come this is a thing how much text can this thing handle, can it handle a lot of text?");
+initCanvas();
 
-console.log(bubble.toDataURL());
+SceneManager = require("./scene_manager");
 
-image = new Image();
+sceneManager = new SceneManager();
 
-image.src = bubble.toDataURL();
+sceneManager.render();
 
-document.body.appendChild(image);
+Character = require("./characters/character.coffee");
+
+char1 = new Character(sceneManager.scene);
+
+char1.sayMessage("Hello");
+
+window.char1 = char1;
 
 Speech = require("speechjs");
 
@@ -424,20 +490,115 @@ recognizer = new Speech({
   debugging: true,
   continuous: true,
   interimResults: true,
-  autoRestart: true
+  autoRestart: true,
+  pfilter: false
 });
 
+currentImage = null;
+
+recognizer.on("interimResult", function() {});
+
 recognizer.on("finalResult", function(message) {
-  bubble.render(message);
-  image = new Image();
-  image.src = bubble.toDataURL();
-  return document.body.appendChild(image);
+  return char1.sayMessage(message);
 });
 
 recognizer.start();
 
 
-},{"./ui/speech_bubbler":5,"speechjs":1}],5:[function(require,module,exports){
+},{"./characters/character.coffee":4,"./scene_manager":6,"./ui/init_canvas":7,"./ui/speech_bubbler":8,"speechjs":1}],6:[function(require,module,exports){
+var SceneManager,
+  __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+
+SceneManager = (function() {
+  SceneManager.prototype.canvas = null;
+
+  SceneManager.prototype.scene = null;
+
+  SceneManager.prototype.renderer = null;
+
+  SceneManager.prototype.camera = null;
+
+  SceneManager.prototype.stopped = false;
+
+  function SceneManager() {
+    this.render = __bind(this.render, this);
+    this.captureCanvas();
+    this.createScene();
+    this.createRenderer();
+    this.createGroundAndSky();
+  }
+
+  SceneManager.prototype.captureCanvas = function() {
+    return this.canvas = document.getElementById("worldCanvas");
+  };
+
+  SceneManager.prototype.render = function() {
+    if (!this.stopped) {
+      window.requestAnimationFrame(this.render);
+    }
+    return this.renderer.render(this.scene, this.camera);
+  };
+
+  SceneManager.prototype.createScene = function() {
+    var ASPECT, FAR, NEAR, SCREEN_HEIGHT, SCREEN_WIDTH, VIEW_ANGLE;
+    this.scene = new THREE.Scene();
+    SCREEN_WIDTH = window.innerWidth;
+    SCREEN_HEIGHT = window.innerHeight;
+    VIEW_ANGLE = 30;
+    ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT;
+    NEAR = 0.1;
+    FAR = 20000;
+    this.camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+    this.scene.add(this.camera);
+    this.camera.position.set(0, 150, 400);
+    return this.camera.lookAt(this.scene.position);
+  };
+
+  SceneManager.prototype.createGroundAndSky = function() {
+    var floor, floorGeometry, floorMaterial, skyBox, skyBoxGeometry, skyBoxMaterial;
+    floorMaterial = new THREE.MeshBasicMaterial({
+      color: "green",
+      side: THREE.DoubleSide
+    });
+    floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
+    floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.position.y = -0.5;
+    floor.rotation.x = Math.PI / 2;
+    this.scene.add(floor);
+    skyBoxGeometry = new THREE.BoxGeometry(10000, 10000, 10000);
+    skyBoxMaterial = new THREE.MeshBasicMaterial({
+      color: 0x9999ff,
+      side: THREE.BackSide
+    });
+    skyBox = new THREE.Mesh(skyBoxGeometry, skyBoxMaterial);
+    this.scene.add(skyBox);
+    return this.scene.fog = new THREE.FogExp2(0x9999ff, 0.0015);
+  };
+
+  SceneManager.prototype.createRenderer = function() {
+    return this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      canvas: this.canvas
+    });
+  };
+
+  return SceneManager;
+
+})();
+
+module.exports = SceneManager;
+
+
+},{}],7:[function(require,module,exports){
+module.exports = function() {
+  var worldCanvas;
+  worldCanvas = document.getElementById("worldCanvas");
+  worldCanvas.setAttribute("width", window.innerWidth);
+  return worldCanvas.setAttribute("height", window.innerHeight);
+};
+
+
+},{}],8:[function(require,module,exports){
 var CANVAS_HEIGHT, CANVAS_WIDTH, LINE_HEIGHT, SpeechBubbler, wordWrapper;
 
 CANVAS_WIDTH = 300;
@@ -555,4 +716,4 @@ SpeechBubbler = (function() {
 module.exports = SpeechBubbler;
 
 
-},{"word-wrapper":3}]},{},[4])
+},{"word-wrapper":3}]},{},[5])
