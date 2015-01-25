@@ -420,20 +420,24 @@ Character = (function() {
 
   Character.prototype.characterMaterial = null;
 
+  Character.prototype.characterSpeechGroup = null;
+
   function Character(scene) {
     this.clearMessage = __bind(this.clearMessage, this);
-    var characterGeometry, speechGeometry;
+    var characterGeometry, characterTexture, speechGeometry;
     this.bubbler = new SpeechBubbler();
     this.speechTexture = new THREE.Texture(this.bubbler.canvas);
     this.speechTexture.needsUpdate = true;
+    characterTexture = new THREE.ImageUtils.loadTexture('images/character-forward.png');
+    characterTexture.minFilter = characterTexture.magFilter = THREE.NearestFilter;
     this.characterMaterial = new THREE.MeshBasicMaterial({
-      color: "red",
+      map: characterTexture,
       side: THREE.DoubleSide
     });
+    this.characterMaterial.transparent = true;
     characterGeometry = new THREE.PlaneGeometry(25, 35, 1, 1);
     this.characterMesh = new THREE.Mesh(characterGeometry, this.characterMaterial);
-    this.characterMesh.position.set(-100, 25, 0);
-    scene.add(this.characterMesh);
+    this.characterMesh.position.set(-100, 17, 0);
     this.speechMaterial = new THREE.MeshBasicMaterial({
       map: this.speechTexture,
       side: THREE.DoubleSide
@@ -441,8 +445,12 @@ Character = (function() {
     this.speechMaterial.transparent = true;
     speechGeometry = new THREE.PlaneGeometry(50, 80, 1, 1);
     this.speechMesh = new THREE.Mesh(speechGeometry, this.speechMaterial);
-    this.speechMesh.position.set(-70, 25 + 35 + 23, 0);
-    scene.add(this.speechMesh);
+    this.speechMesh.position.set(-70, 17 + 35 + 15, 1);
+    this.characterSpeechGroup = new THREE.Object3D();
+    this.characterSpeechGroup.add(this.characterMesh);
+    this.characterSpeechGroup.add(this.speechMesh);
+    scene.add(this.characterSpeechGroup);
+    window.CSG = this.characterSpeechGroup;
   }
 
   Character.prototype.moveToPosition = function(x, y) {};
