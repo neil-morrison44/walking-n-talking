@@ -1,0 +1,45 @@
+#gameCanvas{
+  border-style:solid;
+  border-width:1px;
+  border-color:black;
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  background-color:white;
+  box-shadow:0px 0px 150px black;
+}
+body{
+  background-color:rgb(245,245,245);
+}
+
+#postgame{
+  opacity: 0;
+}
+
+.canvasCover{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  width:600px;
+  height:505px;
+  z-index: 10;
+  background-color:black;
+  color:white;
+  font-size:40px;
+  padding:15px;
+  box-sizing:border-box;
+
+  transition: opacity 1s;
+
+  &.fadeIn{
+    opacity: 1 !important;
+  }
+
+  &#pregame p{
+    opacity: 0;
+    transition: opacity 1s;
+    &.fadeIn{
+      opacity: 1;
+    }
+  }
+}
