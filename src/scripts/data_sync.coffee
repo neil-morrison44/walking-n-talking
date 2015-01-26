@@ -4,6 +4,7 @@ class PubNubManager
     @pubnub = PUBNUB.init
       publish_key   : 'pub-c-825171df-922e-4a9c-811c-eb24de90556c'
       subscribe_key : 'sub-c-9d224ea2-a591-11e4-8f9e-0619f8945a4f'
+      ssl: true
 
     @pubnub.subscribe
       channel : "walking-n-talking"
