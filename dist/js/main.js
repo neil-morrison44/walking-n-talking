@@ -274,6 +274,902 @@ Emitter.prototype.hasListeners = function(event){
 };
 
 },{}],3:[function(require,module,exports){
+/**
+ * Tween.js - Licensed under the MIT license
+ * https://github.com/sole/tween.js
+ * ----------------------------------------------
+ *
+ * See https://github.com/sole/tween.js/graphs/contributors for the full list of contributors.
+ * Thank you all, you're awesome!
+ */
+
+// Date.now shim for (ahem) Internet Explo(d|r)er
+if ( Date.now === undefined ) {
+
+	Date.now = function () {
+
+		return new Date().valueOf();
+
+	};
+
+}
+
+var TWEEN = TWEEN || ( function () {
+
+	var _tweens = [];
+
+	return {
+
+		REVISION: '14',
+
+		getAll: function () {
+
+			return _tweens;
+
+		},
+
+		removeAll: function () {
+
+			_tweens = [];
+
+		},
+
+		add: function ( tween ) {
+
+			_tweens.push( tween );
+
+		},
+
+		remove: function ( tween ) {
+
+			var i = _tweens.indexOf( tween );
+
+			if ( i !== -1 ) {
+
+				_tweens.splice( i, 1 );
+
+			}
+
+		},
+
+		update: function ( time ) {
+
+			if ( _tweens.length === 0 ) return false;
+
+			var i = 0;
+
+			time = time !== undefined ? time : ( typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined ? window.performance.now() : Date.now() );
+
+			while ( i < _tweens.length ) {
+
+				if ( _tweens[ i ].update( time ) ) {
+
+					i++;
+
+				} else {
+
+					_tweens.splice( i, 1 );
+
+				}
+
+			}
+
+			return true;
+
+		}
+	};
+
+} )();
+
+TWEEN.Tween = function ( object ) {
+
+	var _object = object;
+	var _valuesStart = {};
+	var _valuesEnd = {};
+	var _valuesStartRepeat = {};
+	var _duration = 1000;
+	var _repeat = 0;
+	var _yoyo = false;
+	var _isPlaying = false;
+	var _reversed = false;
+	var _delayTime = 0;
+	var _startTime = null;
+	var _easingFunction = TWEEN.Easing.Linear.None;
+	var _interpolationFunction = TWEEN.Interpolation.Linear;
+	var _chainedTweens = [];
+	var _onStartCallback = null;
+	var _onStartCallbackFired = false;
+	var _onUpdateCallback = null;
+	var _onCompleteCallback = null;
+	var _onStopCallback = null;
+
+	// Set all starting values present on the target object
+	for ( var field in object ) {
+
+		_valuesStart[ field ] = parseFloat(object[field], 10);
+
+	}
+
+	this.to = function ( properties, duration ) {
+
+		if ( duration !== undefined ) {
+
+			_duration = duration;
+
+		}
+
+		_valuesEnd = properties;
+
+		return this;
+
+	};
+
+	this.start = function ( time ) {
+
+		TWEEN.add( this );
+
+		_isPlaying = true;
+
+		_onStartCallbackFired = false;
+
+		_startTime = time !== undefined ? time : ( typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined ? window.performance.now() : Date.now() );
+		_startTime += _delayTime;
+
+		for ( var property in _valuesEnd ) {
+
+			// check if an Array was provided as property value
+			if ( _valuesEnd[ property ] instanceof Array ) {
+
+				if ( _valuesEnd[ property ].length === 0 ) {
+
+					continue;
+
+				}
+
+				// create a local copy of the Array with the start value at the front
+				_valuesEnd[ property ] = [ _object[ property ] ].concat( _valuesEnd[ property ] );
+
+			}
+
+			_valuesStart[ property ] = _object[ property ];
+
+			if( ( _valuesStart[ property ] instanceof Array ) === false ) {
+				_valuesStart[ property ] *= 1.0; // Ensures we're using numbers, not strings
+			}
+
+			_valuesStartRepeat[ property ] = _valuesStart[ property ] || 0;
+
+		}
+
+		return this;
+
+	};
+
+	this.stop = function () {
+
+		if ( !_isPlaying ) {
+			return this;
+		}
+
+		TWEEN.remove( this );
+		_isPlaying = false;
+
+		if ( _onStopCallback !== null ) {
+
+			_onStopCallback.call( _object );
+
+		}
+
+		this.stopChainedTweens();
+		return this;
+
+	};
+
+	this.stopChainedTweens = function () {
+
+		for ( var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++ ) {
+
+			_chainedTweens[ i ].stop();
+
+		}
+
+	};
+
+	this.delay = function ( amount ) {
+
+		_delayTime = amount;
+		return this;
+
+	};
+
+	this.repeat = function ( times ) {
+
+		_repeat = times;
+		return this;
+
+	};
+
+	this.yoyo = function( yoyo ) {
+
+		_yoyo = yoyo;
+		return this;
+
+	};
+
+
+	this.easing = function ( easing ) {
+
+		_easingFunction = easing;
+		return this;
+
+	};
+
+	this.interpolation = function ( interpolation ) {
+
+		_interpolationFunction = interpolation;
+		return this;
+
+	};
+
+	this.chain = function () {
+
+		_chainedTweens = arguments;
+		return this;
+
+	};
+
+	this.onStart = function ( callback ) {
+
+		_onStartCallback = callback;
+		return this;
+
+	};
+
+	this.onUpdate = function ( callback ) {
+
+		_onUpdateCallback = callback;
+		return this;
+
+	};
+
+	this.onComplete = function ( callback ) {
+
+		_onCompleteCallback = callback;
+		return this;
+
+	};
+
+	this.onStop = function ( callback ) {
+
+		_onStopCallback = callback;
+		return this;
+
+	};
+
+	this.update = function ( time ) {
+
+		var property;
+
+		if ( time < _startTime ) {
+
+			return true;
+
+		}
+
+		if ( _onStartCallbackFired === false ) {
+
+			if ( _onStartCallback !== null ) {
+
+				_onStartCallback.call( _object );
+
+			}
+
+			_onStartCallbackFired = true;
+
+		}
+
+		var elapsed = ( time - _startTime ) / _duration;
+		elapsed = elapsed > 1 ? 1 : elapsed;
+
+		var value = _easingFunction( elapsed );
+
+		for ( property in _valuesEnd ) {
+
+			var start = _valuesStart[ property ] || 0;
+			var end = _valuesEnd[ property ];
+
+			if ( end instanceof Array ) {
+
+				_object[ property ] = _interpolationFunction( end, value );
+
+			} else {
+
+				// Parses relative end values with start as base (e.g.: +10, -3)
+				if ( typeof(end) === "string" ) {
+					end = start + parseFloat(end, 10);
+				}
+
+				// protect against non numeric properties.
+				if ( typeof(end) === "number" ) {
+					_object[ property ] = start + ( end - start ) * value;
+				}
+
+			}
+
+		}
+
+		if ( _onUpdateCallback !== null ) {
+
+			_onUpdateCallback.call( _object, value );
+
+		}
+
+		if ( elapsed == 1 ) {
+
+			if ( _repeat > 0 ) {
+
+				if( isFinite( _repeat ) ) {
+					_repeat--;
+				}
+
+				// reassign starting values, restart by making startTime = now
+				for( property in _valuesStartRepeat ) {
+
+					if ( typeof( _valuesEnd[ property ] ) === "string" ) {
+						_valuesStartRepeat[ property ] = _valuesStartRepeat[ property ] + parseFloat(_valuesEnd[ property ], 10);
+					}
+
+					if (_yoyo) {
+						var tmp = _valuesStartRepeat[ property ];
+						_valuesStartRepeat[ property ] = _valuesEnd[ property ];
+						_valuesEnd[ property ] = tmp;
+					}
+
+					_valuesStart[ property ] = _valuesStartRepeat[ property ];
+
+				}
+
+				if (_yoyo) {
+					_reversed = !_reversed;
+				}
+
+				_startTime = time + _delayTime;
+
+				return true;
+
+			} else {
+
+				if ( _onCompleteCallback !== null ) {
+
+					_onCompleteCallback.call( _object );
+
+				}
+
+				for ( var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++ ) {
+
+					_chainedTweens[ i ].start( time );
+
+				}
+
+				return false;
+
+			}
+
+		}
+
+		return true;
+
+	};
+
+};
+
+
+TWEEN.Easing = {
+
+	Linear: {
+
+		None: function ( k ) {
+
+			return k;
+
+		}
+
+	},
+
+	Quadratic: {
+
+		In: function ( k ) {
+
+			return k * k;
+
+		},
+
+		Out: function ( k ) {
+
+			return k * ( 2 - k );
+
+		},
+
+		InOut: function ( k ) {
+
+			if ( ( k *= 2 ) < 1 ) return 0.5 * k * k;
+			return - 0.5 * ( --k * ( k - 2 ) - 1 );
+
+		}
+
+	},
+
+	Cubic: {
+
+		In: function ( k ) {
+
+			return k * k * k;
+
+		},
+
+		Out: function ( k ) {
+
+			return --k * k * k + 1;
+
+		},
+
+		InOut: function ( k ) {
+
+			if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k;
+			return 0.5 * ( ( k -= 2 ) * k * k + 2 );
+
+		}
+
+	},
+
+	Quartic: {
+
+		In: function ( k ) {
+
+			return k * k * k * k;
+
+		},
+
+		Out: function ( k ) {
+
+			return 1 - ( --k * k * k * k );
+
+		},
+
+		InOut: function ( k ) {
+
+			if ( ( k *= 2 ) < 1) return 0.5 * k * k * k * k;
+			return - 0.5 * ( ( k -= 2 ) * k * k * k - 2 );
+
+		}
+
+	},
+
+	Quintic: {
+
+		In: function ( k ) {
+
+			return k * k * k * k * k;
+
+		},
+
+		Out: function ( k ) {
+
+			return --k * k * k * k * k + 1;
+
+		},
+
+		InOut: function ( k ) {
+
+			if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k * k * k;
+			return 0.5 * ( ( k -= 2 ) * k * k * k * k + 2 );
+
+		}
+
+	},
+
+	Sinusoidal: {
+
+		In: function ( k ) {
+
+			return 1 - Math.cos( k * Math.PI / 2 );
+
+		},
+
+		Out: function ( k ) {
+
+			return Math.sin( k * Math.PI / 2 );
+
+		},
+
+		InOut: function ( k ) {
+
+			return 0.5 * ( 1 - Math.cos( Math.PI * k ) );
+
+		}
+
+	},
+
+	Exponential: {
+
+		In: function ( k ) {
+
+			return k === 0 ? 0 : Math.pow( 1024, k - 1 );
+
+		},
+
+		Out: function ( k ) {
+
+			return k === 1 ? 1 : 1 - Math.pow( 2, - 10 * k );
+
+		},
+
+		InOut: function ( k ) {
+
+			if ( k === 0 ) return 0;
+			if ( k === 1 ) return 1;
+			if ( ( k *= 2 ) < 1 ) return 0.5 * Math.pow( 1024, k - 1 );
+			return 0.5 * ( - Math.pow( 2, - 10 * ( k - 1 ) ) + 2 );
+
+		}
+
+	},
+
+	Circular: {
+
+		In: function ( k ) {
+
+			return 1 - Math.sqrt( 1 - k * k );
+
+		},
+
+		Out: function ( k ) {
+
+			return Math.sqrt( 1 - ( --k * k ) );
+
+		},
+
+		InOut: function ( k ) {
+
+			if ( ( k *= 2 ) < 1) return - 0.5 * ( Math.sqrt( 1 - k * k) - 1);
+			return 0.5 * ( Math.sqrt( 1 - ( k -= 2) * k) + 1);
+
+		}
+
+	},
+
+	Elastic: {
+
+		In: function ( k ) {
+
+			var s, a = 0.1, p = 0.4;
+			if ( k === 0 ) return 0;
+			if ( k === 1 ) return 1;
+			if ( !a || a < 1 ) { a = 1; s = p / 4; }
+			else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
+			return - ( a * Math.pow( 2, 10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) );
+
+		},
+
+		Out: function ( k ) {
+
+			var s, a = 0.1, p = 0.4;
+			if ( k === 0 ) return 0;
+			if ( k === 1 ) return 1;
+			if ( !a || a < 1 ) { a = 1; s = p / 4; }
+			else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
+			return ( a * Math.pow( 2, - 10 * k) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) + 1 );
+
+		},
+
+		InOut: function ( k ) {
+
+			var s, a = 0.1, p = 0.4;
+			if ( k === 0 ) return 0;
+			if ( k === 1 ) return 1;
+			if ( !a || a < 1 ) { a = 1; s = p / 4; }
+			else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
+			if ( ( k *= 2 ) < 1 ) return - 0.5 * ( a * Math.pow( 2, 10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) );
+			return a * Math.pow( 2, -10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) * 0.5 + 1;
+
+		}
+
+	},
+
+	Back: {
+
+		In: function ( k ) {
+
+			var s = 1.70158;
+			return k * k * ( ( s + 1 ) * k - s );
+
+		},
+
+		Out: function ( k ) {
+
+			var s = 1.70158;
+			return --k * k * ( ( s + 1 ) * k + s ) + 1;
+
+		},
+
+		InOut: function ( k ) {
+
+			var s = 1.70158 * 1.525;
+			if ( ( k *= 2 ) < 1 ) return 0.5 * ( k * k * ( ( s + 1 ) * k - s ) );
+			return 0.5 * ( ( k -= 2 ) * k * ( ( s + 1 ) * k + s ) + 2 );
+
+		}
+
+	},
+
+	Bounce: {
+
+		In: function ( k ) {
+
+			return 1 - TWEEN.Easing.Bounce.Out( 1 - k );
+
+		},
+
+		Out: function ( k ) {
+
+			if ( k < ( 1 / 2.75 ) ) {
+
+				return 7.5625 * k * k;
+
+			} else if ( k < ( 2 / 2.75 ) ) {
+
+				return 7.5625 * ( k -= ( 1.5 / 2.75 ) ) * k + 0.75;
+
+			} else if ( k < ( 2.5 / 2.75 ) ) {
+
+				return 7.5625 * ( k -= ( 2.25 / 2.75 ) ) * k + 0.9375;
+
+			} else {
+
+				return 7.5625 * ( k -= ( 2.625 / 2.75 ) ) * k + 0.984375;
+
+			}
+
+		},
+
+		InOut: function ( k ) {
+
+			if ( k < 0.5 ) return TWEEN.Easing.Bounce.In( k * 2 ) * 0.5;
+			return TWEEN.Easing.Bounce.Out( k * 2 - 1 ) * 0.5 + 0.5;
+
+		}
+
+	}
+
+};
+
+TWEEN.Interpolation = {
+
+	Linear: function ( v, k ) {
+
+		var m = v.length - 1, f = m * k, i = Math.floor( f ), fn = TWEEN.Interpolation.Utils.Linear;
+
+		if ( k < 0 ) return fn( v[ 0 ], v[ 1 ], f );
+		if ( k > 1 ) return fn( v[ m ], v[ m - 1 ], m - f );
+
+		return fn( v[ i ], v[ i + 1 > m ? m : i + 1 ], f - i );
+
+	},
+
+	Bezier: function ( v, k ) {
+
+		var b = 0, n = v.length - 1, pw = Math.pow, bn = TWEEN.Interpolation.Utils.Bernstein, i;
+
+		for ( i = 0; i <= n; i++ ) {
+			b += pw( 1 - k, n - i ) * pw( k, i ) * v[ i ] * bn( n, i );
+		}
+
+		return b;
+
+	},
+
+	CatmullRom: function ( v, k ) {
+
+		var m = v.length - 1, f = m * k, i = Math.floor( f ), fn = TWEEN.Interpolation.Utils.CatmullRom;
+
+		if ( v[ 0 ] === v[ m ] ) {
+
+			if ( k < 0 ) i = Math.floor( f = m * ( 1 + k ) );
+
+			return fn( v[ ( i - 1 + m ) % m ], v[ i ], v[ ( i + 1 ) % m ], v[ ( i + 2 ) % m ], f - i );
+
+		} else {
+
+			if ( k < 0 ) return v[ 0 ] - ( fn( v[ 0 ], v[ 0 ], v[ 1 ], v[ 1 ], -f ) - v[ 0 ] );
+			if ( k > 1 ) return v[ m ] - ( fn( v[ m ], v[ m ], v[ m - 1 ], v[ m - 1 ], f - m ) - v[ m ] );
+
+			return fn( v[ i ? i - 1 : 0 ], v[ i ], v[ m < i + 1 ? m : i + 1 ], v[ m < i + 2 ? m : i + 2 ], f - i );
+
+		}
+
+	},
+
+	Utils: {
+
+		Linear: function ( p0, p1, t ) {
+
+			return ( p1 - p0 ) * t + p0;
+
+		},
+
+		Bernstein: function ( n , i ) {
+
+			var fc = TWEEN.Interpolation.Utils.Factorial;
+			return fc( n ) / fc( i ) / fc( n - i );
+
+		},
+
+		Factorial: ( function () {
+
+			var a = [ 1 ];
+
+			return function ( n ) {
+
+				var s = 1, i;
+				if ( a[ n ] ) return a[ n ];
+				for ( i = n; i > 1; i-- ) s *= i;
+				return a[ n ] = s;
+
+			};
+
+		} )(),
+
+		CatmullRom: function ( p0, p1, p2, p3, t ) {
+
+			var v0 = ( p2 - p0 ) * 0.5, v1 = ( p3 - p1 ) * 0.5, t2 = t * t, t3 = t * t2;
+			return ( 2 * p1 - 2 * p2 + v0 + v1 ) * t3 + ( - 3 * p1 + 3 * p2 - 2 * v0 - v1 ) * t2 + v0 * t + p1;
+
+		}
+
+	}
+
+};
+
+module.exports=TWEEN;
+},{}],4:[function(require,module,exports){
+var ua = typeof window !== 'undefined' ? window.navigator.userAgent : ''
+  , isOSX = /OS X/.test(ua)
+  , isOpera = /Opera/.test(ua)
+  , maybeFirefox = !/like Gecko/.test(ua) && !isOpera
+
+var i, output = module.exports = {
+  0:  isOSX ? '<menu>' : '<UNK>'
+, 1:  '<mouse 1>'
+, 2:  '<mouse 2>'
+, 3:  '<break>'
+, 4:  '<mouse 3>'
+, 5:  '<mouse 4>'
+, 6:  '<mouse 5>'
+, 8:  '<backspace>'
+, 9:  '<tab>'
+, 12: '<clear>'
+, 13: '<enter>'
+, 16: '<shift>'
+, 17: '<control>'
+, 18: '<alt>'
+, 19: '<pause>'
+, 20: '<caps-lock>'
+, 21: '<ime-hangul>'
+, 23: '<ime-junja>'
+, 24: '<ime-final>'
+, 25: '<ime-kanji>'
+, 27: '<escape>'
+, 28: '<ime-convert>'
+, 29: '<ime-nonconvert>'
+, 30: '<ime-accept>'
+, 31: '<ime-mode-change>'
+, 27: '<escape>'
+, 32: '<space>'
+, 33: '<page-up>'
+, 34: '<page-down>'
+, 35: '<end>'
+, 36: '<home>'
+, 37: '<left>'
+, 38: '<up>'
+, 39: '<right>'
+, 40: '<down>'
+, 41: '<select>'
+, 42: '<print>'
+, 43: '<execute>'
+, 44: '<snapshot>'
+, 45: '<insert>'
+, 46: '<delete>'
+, 47: '<help>'
+, 91: '<meta>'  // meta-left -- no one handles left and right properly, so we coerce into one.
+, 92: '<meta>'  // meta-right
+, 93: isOSX ? '<meta>' : '<menu>'      // chrome,opera,safari all report this for meta-right (osx mbp).
+, 95: '<sleep>'
+, 106: '<num-*>'
+, 107: '<num-+>'
+, 108: '<num-enter>'
+, 109: '<num-->'
+, 110: '<num-.>'
+, 111: '<num-/>'
+, 144: '<num-lock>'
+, 145: '<scroll-lock>'
+, 160: '<shift-left>'
+, 161: '<shift-right>'
+, 162: '<control-left>'
+, 163: '<control-right>'
+, 164: '<alt-left>'
+, 165: '<alt-right>'
+, 166: '<browser-back>'
+, 167: '<browser-forward>'
+, 168: '<browser-refresh>'
+, 169: '<browser-stop>'
+, 170: '<browser-search>'
+, 171: '<browser-favorites>'
+, 172: '<browser-home>'
+
+  // ff/osx reports '<volume-mute>' for '-'
+, 173: isOSX && maybeFirefox ? '-' : '<volume-mute>'
+, 174: '<volume-down>'
+, 175: '<volume-up>'
+, 176: '<next-track>'
+, 177: '<prev-track>'
+, 178: '<stop>'
+, 179: '<play-pause>'
+, 180: '<launch-mail>'
+, 181: '<launch-media-select>'
+, 182: '<launch-app 1>'
+, 183: '<launch-app 2>'
+, 186: ';'
+, 187: '='
+, 188: ','
+, 189: '-'
+, 190: '.'
+, 191: '/'
+, 192: '`'
+, 219: '['
+, 220: '\\'
+, 221: ']'
+, 222: "'"
+, 223: '<meta>'
+, 224: '<meta>'       // firefox reports meta here.
+, 226: '<alt-gr>'
+, 229: '<ime-process>'
+, 231: isOpera ? '`' : '<unicode>'
+, 246: '<attention>'
+, 247: '<crsel>'
+, 248: '<exsel>'
+, 249: '<erase-eof>'
+, 250: '<play>'
+, 251: '<zoom>'
+, 252: '<no-name>'
+, 253: '<pa-1>'
+, 254: '<clear>'
+}
+
+for(i = 58; i < 65; ++i) {
+  output[i] = String.fromCharCode(i)
+}
+
+// 0-9
+for(i = 48; i < 58; ++i) {
+  output[i] = (i - 48)+''
+}
+
+// A-Z
+for(i = 65; i < 91; ++i) {
+  output[i] = String.fromCharCode(i)
+}
+
+// num0-9
+for(i = 96; i < 106; ++i) {
+  output[i] = '<num-'+(i - 96)+'>'
+}
+
+// F1-F24
+for(i = 112; i < 136; ++i) {
+  output[i] = 'F'+(i-111)
+}
+
+},{}],5:[function(require,module,exports){
 var newline = /\n/
 var newlineChar = '\n'
 var whitespace = /\s/
@@ -401,11 +1297,13 @@ function monospace(text, start, end, width) {
         end: start+glyphs
     }
 }
-},{}],4:[function(require,module,exports){
-var Character, SpeechBubbler,
+},{}],6:[function(require,module,exports){
+var Character, SpeechBubbler, TWEEN,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
 SpeechBubbler = require("../ui/speech_bubbler");
+
+TWEEN = require("tween.js");
 
 Character = (function() {
   Character.prototype.id = null;
@@ -453,14 +1351,42 @@ Character = (function() {
     window.CSG = this.characterSpeechGroup;
   }
 
-  Character.prototype.moveToPosition = function(x, y) {};
+  Character.prototype.randomisePosition = function() {
+    this.characterSpeechGroup.position.x = (Math.random() * 100) - 50;
+    return this.characterSpeechGroup.position.z = (Math.random() * 100) - 50;
+  };
+
+  Character.prototype.getPosition = function() {
+    return {
+      x: this.characterSpeechGroup.position.x,
+      z: this.characterSpeechGroup.position.z
+    };
+  };
+
+  Character.prototype.setPosition = function(data) {
+    this.characterSpeechGroup.position.x = data.x;
+    return this.characterSpeechGroup.position.z = data.z;
+  };
+
+  Character.prototype.moveToPosition = function(position) {
+    this.characterSpeechGroup.position.x = position.x;
+    return this.characterSpeechGroup.position.z = position.z;
+  };
+
+  Character.prototype.moveDelta = function(x, z) {
+    this.characterSpeechGroup.position.x += x;
+    return this.characterSpeechGroup.position.z += z;
+  };
 
   Character.prototype.sayMessage = function(text) {
     this.bubbler.render(text);
     return this.speechTexture.needsUpdate = true;
   };
 
-  Character.prototype.clearMessage = function() {};
+  Character.prototype.clearMessage = function() {
+    this.bubbler.clear();
+    return this.speechTexture.needsUpdate = true;
+  };
 
   return Character;
 
@@ -469,53 +1395,241 @@ Character = (function() {
 module.exports = Character;
 
 
-},{"../ui/speech_bubbler":8}],5:[function(require,module,exports){
-var Character, SceneManager, Speech, SpeechBubbler, char1, currentImage, initCanvas, recognizer, sceneManager;
+},{"../ui/speech_bubbler":12,"tween.js":3}],7:[function(require,module,exports){
+var Character, CharacterPool;
+
+Character = require("./character");
+
+CharacterPool = (function() {
+  CharacterPool.prototype.currentCharacters = [];
+
+  CharacterPool.prototype.scene = null;
+
+  function CharacterPool(scene) {
+    this.scene = scene;
+  }
+
+  CharacterPool.prototype.byId = function(id) {
+    var character, _ref;
+    return (_ref = (function() {
+      var _i, _len, _ref1, _results;
+      _ref1 = this.currentCharacters;
+      _results = [];
+      for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
+        character = _ref1[_i];
+        if (character.id === id) {
+          _results.push(character);
+        }
+      }
+      return _results;
+    }).call(this)) != null ? _ref[0] : void 0;
+  };
+
+  CharacterPool.prototype.createCharacter = function(data) {
+    var newCharacter;
+    newCharacter = new Character(this.scene);
+    this.currentCharacters.push(newCharacter);
+    newCharacter.id = data.char_id;
+    newCharacter.setPosition(data.position);
+    console.log("character created");
+    return newCharacter;
+  };
+
+  return CharacterPool;
+
+})();
+
+module.exports = CharacterPool;
+
+
+},{"./character":6}],8:[function(require,module,exports){
+var PubNubManager,
+  __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+
+PubNubManager = (function() {
+  function PubNubManager() {
+    this.sendOnConnect = __bind(this.sendOnConnect, this);
+    this.onConnectSend = __bind(this.onConnectSend, this);
+    this.publish = __bind(this.publish, this);
+    this.handleMessage = __bind(this.handleMessage, this);
+    this.pubnub = PUBNUB.init({
+      publish_key: 'pub-c-825171df-922e-4a9c-811c-eb24de90556c',
+      subscribe_key: 'sub-c-9d224ea2-a591-11e4-8f9e-0619f8945a4f'
+    });
+    this.pubnub.subscribe({
+      channel: "walking-n-talking",
+      message: this.handleMessage,
+      connect: this.sendOnConnect,
+      presence: console.log
+    });
+    this.publishDebounced = _.debounce(this.publish, 50);
+  }
+
+  PubNubManager.pubnub = null;
+
+  PubNubManager.connectData = null;
+
+  PubNubManager.handler = null;
+
+  PubNubManager.prototype.handleMessage = function(message, env, channel) {
+    return typeof this.handler === "function" ? this.handler(message) : void 0;
+  };
+
+  PubNubManager.prototype.publish = function(data) {
+    return this.pubnub.publish({
+      channel: "walking-n-talking",
+      message: data
+    });
+  };
+
+  PubNubManager.prototype.uuid = function() {
+    return this._uuid || (this._uuid = this.pubnub.uuid());
+  };
+
+  PubNubManager.prototype.onConnectSend = function(data) {
+    return this.connectData = data;
+  };
+
+  PubNubManager.prototype.sendOnConnect = function() {
+    if (this.connectData) {
+      return this.publish(this.connectData);
+    }
+  };
+
+  return PubNubManager;
+
+})();
+
+module.exports = PubNubManager;
+
+
+},{}],9:[function(require,module,exports){
+var Character, CharacterPool, DataSync, SceneManager, Speech, SpeechBubbler, char1, characterPool, currentImage, dataSync, initCanvas, pressedKeys, recognizer, sceneManager, startingPosition, vkey;
 
 SpeechBubbler = require("./ui/speech_bubbler");
 
 initCanvas = require("./ui/init_canvas");
 
-initCanvas();
+vkey = require("vkey");
+
+CharacterPool = require("./characters/pool");
 
 SceneManager = require("./scene_manager");
 
+Character = require("./characters/character");
+
+initCanvas();
+
 sceneManager = new SceneManager();
 
-sceneManager.render();
-
-Character = require("./characters/character.coffee");
+window.requestAnimationFrame(sceneManager.render);
 
 char1 = new Character(sceneManager.scene);
 
-char1.sayMessage("Hello");
-
 window.char1 = char1;
 
-Speech = require("speechjs");
+char1.randomisePosition();
 
-recognizer = new Speech({
-  debugging: true,
-  continuous: true,
-  interimResults: true,
-  autoRestart: true,
-  pfilter: false
+startingPosition = char1.getPosition();
+
+sceneManager.focusCameraOn(startingPosition.x, startingPosition.z);
+
+if (window.webkitSpeechRecognition) {
+  Speech = require("speechjs");
+  recognizer = new Speech({
+    debugging: true,
+    continuous: true,
+    interimResults: true,
+    autoRestart: true,
+    pfilter: false
+  });
+  currentImage = null;
+  recognizer.on("interimResult", function() {});
+  recognizer.on("finalResult", function(message) {
+    char1.sayMessage(message);
+    return dataSync.publish({
+      char_id: dataSync.uuid(),
+      action: "talk",
+      text: message
+    });
+  });
+  recognizer.start();
+}
+
+pressedKeys = {};
+
+document.body.addEventListener('keydown', function(ev) {
+  return pressedKeys[vkey[ev.keyCode]] = true;
 });
 
-currentImage = null;
-
-recognizer.on("interimResult", function() {});
-
-recognizer.on("finalResult", function(message) {
-  return char1.sayMessage(message);
+document.body.addEventListener('keyup', function(ev) {
+  return delete pressedKeys[vkey[ev.keyCode]];
 });
 
-recognizer.start();
+window.setInterval(function() {
+  var charPos, x, z;
+  if (pressedKeys['W']) {
+    z = -1;
+  } else if (pressedKeys['S']) {
+    z = 1;
+  } else {
+    z = 0;
+  }
+  if (pressedKeys['A']) {
+    x = -1;
+  } else if (pressedKeys['D']) {
+    x = 1;
+  } else {
+    x = 0;
+  }
+  if (!(x === 0 && z === 0)) {
+    char1.moveDelta(x, z);
+    charPos = char1.getPosition();
+    sceneManager.focusCameraOn(charPos.x, charPos.z);
+    return dataSync.publishDebounced({
+      char_id: dataSync.uuid(),
+      action: "walk",
+      position: charPos
+    });
+  }
+}, 16);
+
+DataSync = require("./data_sync");
+
+window.dataSync = dataSync = new DataSync();
+
+characterPool = new CharacterPool(sceneManager.scene);
+
+dataSync.handler = function(message) {
+  var character;
+  if (message.char_id === dataSync.uuid()) {
+    return;
+  }
+  character = characterPool.byId(message.char_id);
+  character || (character = characterPool.createCharacter(message));
+  if (message.action === "create") {
+    characterPool.createCharacter(message);
+  }
+  if (message.action === "walk") {
+    character.moveToPosition(message.position);
+  }
+  if (message.action === "talk") {
+    return character.sayMessage(message.text);
+  }
+};
+
+dataSync.onConnectSend({
+  char_id: dataSync.uuid(),
+  action: "create",
+  position: char1.getPosition()
+});
 
 
-},{"./characters/character.coffee":4,"./scene_manager":6,"./ui/init_canvas":7,"./ui/speech_bubbler":8,"speechjs":1}],6:[function(require,module,exports){
-var SceneManager,
+},{"./characters/character":6,"./characters/pool":7,"./data_sync":8,"./scene_manager":10,"./ui/init_canvas":11,"./ui/speech_bubbler":12,"speechjs":1,"vkey":4}],10:[function(require,module,exports){
+var SceneManager, TWEEN,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+
+TWEEN = require("tween.js");
 
 SceneManager = (function() {
   SceneManager.prototype.canvas = null;
@@ -540,10 +1654,11 @@ SceneManager = (function() {
     return this.canvas = document.getElementById("worldCanvas");
   };
 
-  SceneManager.prototype.render = function() {
+  SceneManager.prototype.render = function(time) {
     if (!this.stopped) {
       window.requestAnimationFrame(this.render);
     }
+    TWEEN.update(time);
     return this.renderer.render(this.scene, this.camera);
   };
 
@@ -558,7 +1673,7 @@ SceneManager = (function() {
     FAR = 20000;
     this.camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
     this.scene.add(this.camera);
-    this.camera.position.set(0, 150, 400);
+    this.camera.position.set(0, 75, 400);
     return this.camera.lookAt(this.scene.position);
   };
 
@@ -583,6 +1698,10 @@ SceneManager = (function() {
     return this.scene.fog = new THREE.FogExp2(0x9999ff, 0.0015);
   };
 
+  SceneManager.prototype.focusCameraOn = function(x, z) {
+    return this.camera.position.set(x - 100, 75, 250 + z);
+  };
+
   SceneManager.prototype.createRenderer = function() {
     return this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -597,7 +1716,7 @@ SceneManager = (function() {
 module.exports = SceneManager;
 
 
-},{}],7:[function(require,module,exports){
+},{"tween.js":3}],11:[function(require,module,exports){
 module.exports = function() {
   var worldCanvas;
   worldCanvas = document.getElementById("worldCanvas");
@@ -606,7 +1725,7 @@ module.exports = function() {
 };
 
 
-},{}],8:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 var CANVAS_HEIGHT, CANVAS_WIDTH, LINE_HEIGHT, SpeechBubbler, wordWrapper;
 
 CANVAS_WIDTH = 300;
@@ -724,4 +1843,4 @@ SpeechBubbler = (function() {
 module.exports = SpeechBubbler;
 
 
-},{"word-wrapper":3}]},{},[5])
+},{"word-wrapper":5}]},{},[9])

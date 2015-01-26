@@ -1,55 +1,108 @@
 SpeechBubbler = require "./ui/speech_bubbler"
-
 initCanvas = require "./ui/init_canvas"
+vkey = require "vkey"
+CharacterPool = require "./characters/pool"
+SceneManager = require "./scene_manager"
+Character = require "./characters/character"
 
 initCanvas()
 
-SceneManager = require "./scene_manager"
 
 sceneManager = new SceneManager()
 
-sceneManager.render()
-
-Character = require "./characters/character.coffee"
+window.requestAnimationFrame(sceneManager.render)
 
 char1 = new Character sceneManager.scene
-
-char1.sayMessage "Hello"
-
 window.char1 = char1
+char1.randomisePosition()
+startingPosition = char1.getPosition()
+sceneManager.focusCameraOn startingPosition.x, startingPosition.z
 
-# bubble = new SpeechBubbler()
+if window.webkitSpeechRecognition
+  Speech = require "speechjs"
 
-# bubble.render "Test message here and here in a new line? How come this is a thing how much text can this thing handle, can it handle a lot of text?"
+  recognizer = new Speech(
+    debugging: true
+    continuous: true
+    interimResults: true
+    autoRestart: true
+    pfilter: false
+  )
+  currentImage = null
+  recognizer.on "interimResult", ->
+    # if currentImage is null
+    #   bubble.render "..."
+    #   currentImage = new Image()
+    #   currentImage.src = bubble.toDataURL()
+    #   document.body.appendChild currentImage
+    #   console.log "started"
 
-# console.log bubble.toDataURL()
+  recognizer.on "finalResult", (message) ->
+    char1.sayMessage message
 
-# image = new Image()
-# image.src = bubble.toDataURL()
+    dataSync.publish
+      char_id: dataSync.uuid()
+      action: "talk"
+      text: message
 
-# document.body.appendChild image
+  recognizer.start()
 
-Speech = require "speechjs"
+pressedKeys = {}
 
-recognizer = new Speech(
-  debugging: true
-  continuous: true
-  interimResults: true
-  autoRestart: true
-  pfilter: false
-)
+document.body.addEventListener 'keydown', (ev) ->
+  pressedKeys[vkey[ev.keyCode]] = true
 
+document.body.addEventListener 'keyup', (ev) ->
+  delete pressedKeys[vkey[ev.keyCode]]
 
-currentImage = null
-recognizer.on "interimResult", ->
-  # if currentImage is null
-  #   bubble.render "..."
-  #   currentImage = new Image()
-  #   currentImage.src = bubble.toDataURL()
-  #   document.body.appendChild currentImage
-  #   console.log "started"
+window.setInterval ->
 
-recognizer.on "finalResult", (message) ->
-  char1.sayMessage message
+  if pressedKeys['W']
+    z = -1
+  else if pressedKeys['S']
+    z = 1
+  else
+    z = 0
+  if pressedKeys['A']
+    x = -1
+  else if pressedKeys['D']
+    x = 1
+  else
+    x = 0
 
-recognizer.start()
+  unless x is 0 and z is 0
+    char1.moveDelta(x, z)
+    charPos = char1.getPosition()
+    sceneManager.focusCameraOn charPos.x, charPos.z
+
+    dataSync.publishDebounced
+      char_id: dataSync.uuid()
+      action: "walk"
+      position: charPos
+
+, 16
+
+DataSync = require "./data_sync"
+
+window.dataSync = dataSync = new DataSync()
+
+characterPool = new CharacterPool(sceneManager.scene)
+
+dataSync.handler = (message) ->
+  if message.char_id is dataSync.uuid()
+    return
+
+  character = characterPool.byId message.char_id
+  character or= characterPool.createCharacter message
+
+  if message.action is "create"
+    characterPool.createCharacter message
+  if message.action is "walk"
+    character.moveToPosition message.position
+  if message.action is "talk"
+    character.sayMessage message.text
+
+dataSync.onConnectSend
+  char_id: dataSync.uuid()
+  action: "create"
+  position: char1.getPosition()

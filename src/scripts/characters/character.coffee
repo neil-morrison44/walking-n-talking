@@ -1,4 +1,5 @@
 SpeechBubbler = require "../ui/speech_bubbler"
+TWEEN = require "tween.js"
 
 class Character
   id: null
@@ -14,7 +15,6 @@ class Character
 
     @speechTexture = new THREE.Texture(@bubbler.canvas)
     @speechTexture.needsUpdate = true
-
 
     characterTexture = new THREE.ImageUtils.loadTexture('images/character-forward.png')
 
@@ -53,11 +53,44 @@ class Character
 
     window.CSG = @characterSpeechGroup
 
+  randomisePosition: ->
+    @characterSpeechGroup.position.x = (Math.random()*100) - 50
+    @characterSpeechGroup.position.z = (Math.random()*100) - 50
 
-  moveToPosition: (x, y) ->
+  getPosition: ->
+    x: @characterSpeechGroup.position.x
+    z: @characterSpeechGroup.position.z
+
+  setPosition: (data) ->
+    @characterSpeechGroup.position.x = data.x
+    @characterSpeechGroup.position.z = data.z
+
+  moveToPosition: (position) ->
+    @characterSpeechGroup.position.x = position.x
+    @characterSpeechGroup.position.z = position.z
+
+    # charPos = @characterSpeechGroup.position
+    # tween = new TWEEN.Tween(
+    #   {
+    #     x: @characterSpeechGroup.position.x
+    #     z: @characterSpeechGroup.position.z
+    #   } )
+    #   .to( { x: x, z: z }, 2500 )
+    #   .onUpdate( (current) ->
+    #     charPos.x = this.x
+    #     charPos.z = this.z
+    #   )
+    # tween.start()
+
+  moveDelta: (x, z) ->
+    @characterSpeechGroup.position.x += x
+    @characterSpeechGroup.position.z += z
+
   sayMessage: (text) ->
     @bubbler.render text
     @speechTexture.needsUpdate = true
-  clearMessage: =>
 
+  clearMessage: =>
+    @bubbler.clear()
+    @speechTexture.needsUpdate = true
 module.exports = Character

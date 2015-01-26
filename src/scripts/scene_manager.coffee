@@ -1,9 +1,10 @@
+TWEEN = require "tween.js"
+
 class SceneManager
   canvas: null
   scene: null
   renderer: null
   camera: null
-
   stopped: false
 
   constructor: ->
@@ -12,14 +13,13 @@ class SceneManager
     @createRenderer()
     @createGroundAndSky()
 
-    
-
   captureCanvas: ->
     @canvas = document.getElementById "worldCanvas"
 
-  render: =>
+  render: (time) =>
     if not @stopped
       window.requestAnimationFrame @render
+    TWEEN.update(time)
     @renderer.render @scene, @camera
 
   createScene: ->
@@ -35,7 +35,7 @@ class SceneManager
 
     @camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR)
     @scene.add @camera
-    @camera.position.set 0, 150, 400
+    @camera.position.set 0, 75, 400
     @camera.lookAt @scene.position
 
   createGroundAndSky: ->
@@ -53,6 +53,26 @@ class SceneManager
     @scene.add skyBox
 
     @scene.fog = new THREE.FogExp2( 0x9999ff, 0.0015 )
+
+  # focusCameraOn: _.debounce (x, z) ->
+  focusCameraOn: (x, z) ->
+    @camera.position.set x - 100, 75, 250 + z
+  #   console.log TWEEN.Easing
+  #   camPos = @camera.position
+  #   tween = new TWEEN.Tween(
+  #     {
+  #       x: camPos.x
+  #       z: camPos.z
+  #     } )
+  #     .to( { x: x, z: z + 300 }, 165 )
+  #     .easing( TWEEN.Easing.Cubic.InOut )
+  #     .onUpdate( ->
+  #       camPos.x = this.x
+  #       camPos.z = this.z
+  #     )
+  #   tween.start()
+  # , 200
+
 
   createRenderer: ->
     @renderer = new THREE.WebGLRenderer(
